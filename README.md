@@ -9,7 +9,6 @@ A professional, modular Python application that monitors **Ontario Tech Universi
 - 🌐 **Web Scraping**: Uses Selenium with Chrome for reliable course data extraction
 - ⚙️ **Configurable**: Easy configuration via environment variables
 - 📊 **Comprehensive Logging**: Detailed logging with configurable levels
-- 🐳 **Docker Support**: Ready-to-deploy containerized solution
 - 🔄 **Graceful Shutdown**: Proper resource cleanup and signal handling
 - 🛡️ **Error Handling**: Robust error handling and recovery mechanisms
 
@@ -34,29 +33,10 @@ cd course_enrollment_notifer
 2. **Configure environment variables**:
 
 ```bash
-# Copy the example environment file
-cp env.example .env
-
-# Edit the configuration (see Configuration section below)
-nano .env  # or use your preferred editor
+TODO:
 ```
 
 3. **Run the application**:
-
-**On Linux/macOS:**
-
-```bash
-chmod +x run.sh
-./run.sh
-```
-
-**On Windows:**
-
-```cmd
-run.bat
-```
-
-**Or manually:**
 
 ```bash
 python -m venv venv
@@ -157,79 +137,6 @@ COURSE_CODES=CS101,MATH205,PHYS301        # Generic format
 COURSE_CODES=COMP-SCI-101,MATH-205        # Hyphenated format
 ```
 
-## Docker Deployment 🐳
-
-### Using Docker Compose (Recommended)
-
-1. **Build and run**:
-
-```bash
-# Make sure your .env file is configured
-docker-compose up -d
-```
-
-2. **View logs**:
-
-```bash
-docker-compose logs -f course-notifier
-```
-
-3. **Stop the service**:
-
-```bash
-docker-compose down
-```
-
-### Using Docker directly
-
-1. **Build the image**:
-
-```bash
-docker build -t course-notifier .
-```
-
-2. **Run the container**:
-
-```bash
-docker run -d --name course-notifier \
-  --env-file .env \
-  -v $(pwd)/chrome_profile:/app/chrome_profile \
-  -v $(pwd)/logs:/app/logs \
-  course-notifier
-```
-
-## Linux Service Setup 🛠️
-
-To run as a system service on Linux:
-
-1. **Update the service file**:
-
-```bash
-# Edit course-notifier.service
-nano course-notifier.service
-
-# Update these paths:
-# - User=your_username
-# - WorkingDirectory=/path/to/your/course_checker
-# - ExecStart=/path/to/your/course_checker/venv/bin/python /path/to/your/course_checker/main.py
-```
-
-2. **Install and start the service**:
-
-```bash
-sudo cp course-notifier.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable course-notifier
-sudo systemctl start course-notifier
-```
-
-3. **Monitor the service**:
-
-```bash
-sudo systemctl status course-notifier
-sudo journalctl -u course-notifier -f
-```
-
 ## Architecture 🏗️
 
 The application follows a modular architecture:
@@ -243,11 +150,6 @@ course_enrollment_notifer/
 ├── scheduler.py       # Job scheduling and main orchestration
 ├── main.py           # Application entry point
 ├── requirements.txt   # Python dependencies
-├── env.example       # Environment variables template
-├── run.sh           # Unix startup script
-├── run.bat          # Windows startup script
-├── Dockerfile       # Docker container definition
-└── docker-compose.yml # Docker Compose configuration
 ```
 
 ### Key Components
