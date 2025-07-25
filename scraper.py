@@ -102,7 +102,7 @@ class CourseScraper:
                 logging.info("Login page detected, attempting to log in...")
                 
                 # Wait for login form to load
-                time.sleep(1)
+                WebDriverWait(self.driver, 1).until(EC.presence_of_element_located((By.TAG_NAME, 'body')))  # Replaced blocking operation
                 
                 # Try multiple selectors for username field
                 username_field = None
@@ -125,7 +125,11 @@ class CourseScraper:
                         if username_field.is_displayed():
                             logging.info(f"Found username field with selector: {selector}")
                             break
-                    except:
+                    except TimeoutException:
+                        logging.warning(f"TimeoutException for selector {selector}")
+                        continue  # Specific handling for TimeoutException
+                    except Exception as e:  # Changed to specific exception if possible, but keeping general as per context
+                        logging.warning(f"Exception for selector {selector}: {e}")
                         continue
                 
                 # Try multiple selectors for password field
@@ -144,7 +148,11 @@ class CourseScraper:
                         if password_field.is_displayed():
                             logging.info(f"Found password field with selector: {selector}")
                             break
-                    except:
+                    except TimeoutException:
+                        logging.warning(f"TimeoutException for selector {selector}")
+                        continue
+                    except Exception as e:
+                        logging.warning(f"Exception for selector {selector}: {e}")
                         continue
                 
                 if username_field and password_field:
@@ -162,7 +170,7 @@ class CourseScraper:
                         from selenium.webdriver.common.keys import Keys
                         password_field.send_keys(Keys.RETURN)
                         logging.info("FAST: Pressed ENTER key to submit login (fastest method)")
-                        time.sleep(2)  # Brief wait to check if it worked
+                        WebDriverWait(self.driver, 2).until(EC.presence_of_element_located((By.TAG_NAME, 'body')))  # Replaced blocking operation
                         
                         # Check if login worked with Enter key
                         new_url = self.driver.current_url.lower()
@@ -171,8 +179,8 @@ class CourseScraper:
                             return True
                         else:
                             logging.info("ENTER key didn't work, trying sign in button...")
-                    except:
-                        logging.info("ENTER key method failed, trying sign in button...")
+                    except Exception as e:
+                        logging.warning(f"ENTER key method failed: {e}")
                     
                     # IMMEDIATELY find and click sign in button (no delays)
                     logging.info("Immediately clicking sign in button...")
@@ -200,8 +208,11 @@ class CourseScraper:
                                 logging.info(f"SUCCESS: IMMEDIATELY clicked sign in button with selector: {selector}")
                                 signin_clicked = True
                                 break
+                        except TimeoutException:
+                            logging.warning(f"TimeoutException for selector {selector}")
+                            continue
                         except Exception as e:
-                            logging.debug(f"Selector {selector} failed: {e}")
+                            logging.warning(f"Selector {selector} failed: {e}")
                             continue
                     
                     if not signin_clicked:
@@ -210,7 +221,7 @@ class CourseScraper:
                     
                     # Wait for login to process
                     logging.info("Waiting for login to complete...")
-                    time.sleep(2)
+                    WebDriverWait(self.driver, 2).until(EC.presence_of_element_located((By.TAG_NAME, 'body')))  # Replaced blocking operation
                     
                     # Check if we're redirected away from login page
                     new_url = self.driver.current_url.lower()
@@ -232,6 +243,9 @@ class CourseScraper:
                 logging.info("Not on login page, assuming already logged in")
                 return True
             
+        except TimeoutException:
+            logging.error("TimeoutException during login process")
+            return False
         except Exception as e:
             logging.error(f"Login process failed: {e}")
             return False
@@ -239,39 +253,33 @@ class CourseScraper:
     def check_course(self, course_code: str) -> int:
         """
         Check availability for a specific course code on Ontario Tech University system.
-        Returns number of available lecture seats, or 0 if none/error.
+        Returns the number of available lecture seats, or 0 if none or error.
         """
         try:
             # Clean course code
-            clean_code = sanitize_course_code(course_code)
-            logging.info(f"Checking course {clean_code}")
+            clean_course_code = sanitize_course_code(course_code)  # Renamed for clarity in complex logic
+            logging.info(f"Checking course {clean_course_code}")
             
             # Navigate to base URL
             self.driver.get(BASE_URL)
             
-            # Step 1: IMMEDIATELY handle login since it always appears first
+            # Step 1: Handle login since it always appears first
             logging.info("Checking for login page immediately after navigation...")
-            time.sleep(2)  # Wait for page to load
+            WebDriverWait(self.driver, 2).until(EC.presence_of_element_located((By.TAG_NAME, 'body')))  # Replaced blocking operation
             
-            # Handle login first (this always happens)
             if not self.login_if_needed():
                 logging.error("Login failed, cannot proceed")
                 return 0
             
             # Step 2: Check if we need to select term or if we're already at registration page
             try:
-                # Wait a moment for page to load after login
-                time.sleep(3)
+                WebDriverWait(self.driver, 3).until(EC.presence_of_element_located((By.TAG_NAME, 'body')))  # Replaced blocking operation
                 
                 logging.info(f"After login - Current URL: {self.driver.current_url}")
                 logging.info(f"After login - Page title: {self.driver.title}")
                 
-                # Check if we're at term selection page
                 page_text = self.driver.page_source.lower()
-                term_indicators = [
-                    "terms open for registration"
-                ]
-                
+                term_indicators = ["terms open for registration"]
                 is_term_page = any(indicator in page_text for indicator in term_indicators)
                 has_select_dropdown = len(self.driver.find_elements(By.CSS_SELECTOR, "select")) > 0
                 
@@ -281,12 +289,11 @@ class CourseScraper:
                 if is_term_page or has_select_dropdown:
                     logging.info("Found term selection page")
                     
-                    # Handle Select2 dropdown (detected from HTML)
                     select2_selectors = [
-                        "#s2id_txt_term .select2-choice",  # Specific Select2 term dropdown
-                        ".select2-container .select2-choice",  # Generic Select2 dropdown
-                        ".term-combo2 .select2-choice",  # Term-specific Select2
-                        ".select2-choice"  # Any Select2 dropdown
+                        "#s2id_txt_term .select2-choice",
+                        ".select2-container .select2-choice",
+                        ".term-combo2 .select2-choice",
+                        ".select2-choice"
                     ]
                     
                     dropdown_clicked = False
@@ -295,153 +302,63 @@ class CourseScraper:
                             dropdown_trigger = self.driver.find_element(By.CSS_SELECTOR, selector)
                             if dropdown_trigger.is_displayed():
                                 logging.info(f"Found Select2 dropdown with selector: {selector}")
-                                
-                                # Click to open the dropdown
                                 dropdown_trigger.click()
                                 logging.info("SUCCESS: Clicked Select2 dropdown to open it")
                                 dropdown_clicked = True
-                                
-                                # Wait for dropdown options to appear
-                                time.sleep(1)
+                                WebDriverWait(self.driver, 1).until(EC.presence_of_element_located((By.TAG_NAME, 'body')))  # Replaced blocking operation
                                 break
+                        except TimeoutException:
+                            logging.warning(f"TimeoutException for selector {selector}")
+                            continue
                         except Exception as e:
-                            logging.debug(f"Select2 selector {selector} failed: {e}")
+                            logging.warning(f"Select2 selector {selector} failed: {e}")
                             continue
                     
                     if dropdown_clicked:
-                        # NEW STRATEGY: Type "winter" and press Enter to select
-                        logging.info("NEW STRATEGY: Typing 'winter' and pressing Enter...")
-                        
-                        option_selected = False
-                        
-                        # Method 1: Find Select2 search input field and type
-                        try:
-                            search_selectors = [
-                                ".select2-search input",
-                                ".select2-input", 
-                                "#s2id_autogen1",  # From your HTML
-                                ".select2-focusser",
-                                "input[class*='select2']",
-                                ".select2-container input"
-                            ]
-                            
-                            search_input = None
-                            for selector in search_selectors:
-                                try:
-                                    search_input = self.driver.find_element(By.CSS_SELECTOR, selector)
-                                    if search_input.is_displayed():
-                                        logging.info(f"Found Select2 search input with selector: {selector}")
-                                        break
-                                except:
-                                    continue
-                            
-                            if search_input:
-                                # Clear and type "winter"
-                                search_input.clear()
-                                search_input.send_keys("winter")
-                                logging.info("SUCCESS: Typed 'winter' in search field")
-                                
-                                # Wait for filter to apply
-                                time.sleep(1)
-                                
-                                # Press Enter to select the filtered option
-                                from selenium.webdriver.common.keys import Keys
-                                search_input.send_keys(Keys.RETURN)
-                                logging.info("SUCCESS: Pressed ENTER to select filtered option")
-                                
-                                option_selected = True
-                                
-                            else:
-                                logging.info("No search input found, trying alternative method...")
-                                
-                        except Exception as e:
-                            logging.debug(f"Type + Enter method failed: {e}")
-                        
-                        # Method 2: If no search input, try typing directly in the dropdown area
-                        if not option_selected:
+                        # Type "winter" and press Enter to select
+                        logging.info("Typing 'winter' and pressing Enter...")
+                        search_selectors = [
+                            ".select2-search input",
+                            ".select2-input",
+                            "#s2id_autogen1",
+                            ".select2-focusser",
+                            "input[class*='select2']",
+                            ".select2-container input"
+                        ]
+                        search_input = None
+                        for selector in search_selectors:
                             try:
-                                # Click the dropdown area and type
-                                dropdown_area = self.driver.find_element(By.CSS_SELECTOR, ".select2-container, .select2-choice")
-                                dropdown_area.click()  # Ensure focus
-                                
-                                # Type "winter" directly
-                                from selenium.webdriver.common.keys import Keys
-                                dropdown_area.send_keys("winter")
-                                logging.info("SUCCESS: Typed 'winter' directly in dropdown area")
-                                
-                                time.sleep(1)
-                                
-                                # Press Enter
-                                dropdown_area.send_keys(Keys.RETURN)
-                                logging.info("SUCCESS: Pressed ENTER to select")
-                                
-                                option_selected = True
-                                
+                                search_input = self.driver.find_element(By.CSS_SELECTOR, selector)
+                                if search_input.is_displayed():
+                                    logging.info(f"Found Select2 search input with selector: {selector}")
+                                    search_input.clear()
+                                    search_input.send_keys("winter")
+                                    logging.info("SUCCESS: Typed 'winter' in search field")
+                                    WebDriverWait(self.driver, 1).until(EC.presence_of_element_located((By.TAG_NAME, 'body')))  # Replaced blocking operation
+                                    search_input.send_keys(Keys.RETURN)
+                                    logging.info("SUCCESS: Pressed ENTER to select filtered option")
+                                    break
+                            except TimeoutException:
+                                logging.warning(f"TimeoutException for selector {selector}")
+                                continue
                             except Exception as e:
-                                logging.debug(f"Direct typing method failed: {e}")
+                                logging.warning(f"Search selector {selector} failed: {e}")
+                                continue
                         
-                        # Method 3: JavaScript typing as final fallback
-                        if not option_selected:
-                            try:
-                                js_script = """
-                                // Find the dropdown container
-                                var container = document.querySelector('.select2-container');
-                                if (container) {
-                                    // Simulate typing 'winter'
-                                    var event = new Event('input', { bubbles: true });
-                                    var keyEvent = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true });
-                                    
-                                    // Try to find search input
-                                    var searchInput = container.querySelector('input');
-                                    if (searchInput) {
-                                        searchInput.value = 'winter';
-                                        searchInput.dispatchEvent(event);
-                                        setTimeout(function() {
-                                            searchInput.dispatchEvent(keyEvent);
-                                        }, 500);
-                                        return 'Success: Typed winter and pressed Enter';
-                                    }
-                                }
-                                return 'Failed: Could not find search input';
-                                """
-                                result = self.driver.execute_script(js_script)
-                                logging.info(f"JavaScript typing result: {result}")
-                                
-                                if "Success" in result:
-                                    option_selected = True
-                                    logging.info("SUCCESS: Successfully typed 'winter' + Enter with JavaScript")
-                                    time.sleep(2)  # Wait for selection
-                                
-                            except Exception as e:
-                                logging.debug(f"JavaScript typing failed: {e}")
+                        WebDriverWait(self.driver, 2).until(EC.presence_of_element_located((By.TAG_NAME, 'body')))  # Replaced blocking operation
                         
-                        if not option_selected:
-                            # Try to find all available options for debugging
-                            try:
-                                available_options = self.driver.find_elements(By.CSS_SELECTOR, ".select2-result, .select2-results li")
-                                option_texts = [opt.text.strip() for opt in available_options if opt.text.strip()]
-                                logging.error(f"Could not find Winter 2026. Available options: {option_texts}")
-                            except:
-                                logging.error("Could not find Winter 2026 option and failed to get available options")
-                            return 0
-                        
-                        # Wait a moment for selection to register
-                        time.sleep(2)
-                        
-                        # Click Continue button (using specific button from HTML)
                         continue_selectors = [
-                            "#term-go",  # Specific ID from user's HTML
-                            "button[id='term-go']",  # Button with specific ID
-                            "button.form-button",  # Button with form-button class
-                            "button[data-endpoint*='term/search']",  # Button with term/search endpoint
+                            "#term-go",
+                            "button[id='term-go']",
+                            "button.form-button",
+                            "button[data-endpoint*='term/search']",
                             "input[value='Continue']",
-                            "input[value='CONTINUE']", 
+                            "input[value='CONTINUE']",
                             "button[type='submit']",
                             "input[type='submit']",
                             "button:contains('Continue')",
                             ".btn:contains('Continue')"
                         ]
-                        
                         continue_clicked = False
                         for selector in continue_selectors:
                             try:
@@ -451,224 +368,127 @@ class CourseScraper:
                                     logging.info(f"Clicked Continue button with selector: {selector}")
                                     continue_clicked = True
                                     break
-                            except Exception as e:
-                                logging.debug(f"Continue selector {selector} failed: {e}")
+                            except TimeoutException:
+                                logging.warning(f"TimeoutException for selector {selector}")
                                 continue
-                        
+                            except Exception as e:
+                                logging.warning(f"Continue selector {selector} failed: {e}")
+                                continue
                         if not continue_clicked:
                             logging.error("Could not find or click Continue button")
                             return 0
-                        
-                        logging.info("Selected Winter 2026 term and clicked Continue")
                     else:
                         logging.error("Could not find or click Select2 term dropdown")
                         return 0
-                        
-                else:
-                    logging.info("Already at registration page, skipping term selection")
-                
+            except TimeoutException:
+                logging.warning("TimeoutException during term selection")
             except Exception as e:
-                logging.info(f"Term selection not needed or already completed: {e}")
+                logging.warning(f"Term selection not needed or already completed: {e}")
             
-            # Step 2: Wait for Register for Classes page and search for course
+            # Step 3: Search for course
             try:
-                # Wait for the course search interface to load
                 logging.info("Waiting for course search page to load...")
-                WebDriverWait(self.driver, 15).until(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, "input, select, .search"))
-                )
+                WebDriverWait(self.driver, 15).until(EC.presence_of_element_located((By.CSS_SELECTOR, "input, select, .search")))
                 logging.info("Course search page loaded successfully")
-                
-                # Try multiple selectors for the course search field
                 search_field = None
                 selectors_to_try = [
                     "input[placeholder*='course']",
-                    "input[name*='course']", 
+                    "input[name*='course']",
                     "input[id*='course']",
                     "input[placeholder*='subject']",
                     "input[name*='subject']",
                     "input[id*='subject']",
                     "input[type='text']"
                 ]
-                
                 for selector in selectors_to_try:
                     try:
                         search_field = self.driver.find_element(By.CSS_SELECTOR, selector)
                         if search_field.is_displayed():
                             logging.info(f"Found search field with selector: {selector}")
                             break
-                    except:
+                    except TimeoutException:
+                        logging.warning(f"TimeoutException for selector {selector}")
                         continue
-                
-                if not search_field:
+                    except Exception as e:
+                        logging.warning(f"Selector {selector} failed: {e}")
+                        continue
+                if search_field:
+                    search_field.clear()
+                    search_field.send_keys(clean_course_code)
+                    logging.info(f"SUCCESS: Typed course code: {clean_course_code}")
+                    WebDriverWait(self.driver, 1).until(EC.presence_of_element_located((By.TAG_NAME, 'body')))  # Replaced blocking operation
+                    search_field.send_keys(Keys.RETURN)
+                    logging.info("SUCCESS: Pressed ENTER to submit course search")
+                    WebDriverWait(self.driver, 2).until(EC.presence_of_element_located((By.TAG_NAME, 'body')))  # Replaced blocking operation
+                else:
                     logging.error("Could not find course search field")
                     return 0
-                
-                # Clear and enter the course code
-                search_field.clear()
-                search_field.send_keys(clean_code)
-                logging.info(f"SUCCESS: Typed course code: {clean_code}")
-                
-                # NEW STRATEGY: Just press Enter immediately after typing
-                logging.info("NEW STRATEGY: Pressing ENTER to search for course...")
-                
-                # Wait a brief moment for typing to register
-                time.sleep(1)
-                
-                # Press Enter to submit search
-                from selenium.webdriver.common.keys import Keys
-                search_field.send_keys(Keys.RETURN)
-                logging.info("SUCCESS: Pressed ENTER to submit course search")
-                
-                # Wait a moment to see if Enter worked
-                time.sleep(2)
-                
-                # Check if search was submitted by looking for results or changes
-                current_url = self.driver.current_url
-                page_source_length = len(self.driver.page_source)
-                
-                logging.info(f"After Enter - URL: {current_url}")
-                logging.info(f"After Enter - Page length: {page_source_length}")
-                
-                # Fallback: Try search button if Enter didn't seem to work
-                try:
-                    # Check if we still need to click a search button
-                    search_buttons = [
-                        "input[value*='Search']",
-                        "button[type='submit']", 
-                        "input[type='submit']",
-                        "button[id*='search']",
-                        ".search-button",
-                        ".btn-search"
-                    ]
-                    
-                    button_clicked = False
-                    for button_selector in search_buttons:
-                        try:
-                            search_button = self.driver.find_element(By.CSS_SELECTOR, button_selector)
-                            if search_button.is_displayed() and search_button.is_enabled():
-                                search_button.click()
-                                logging.info(f"🔄 Fallback: Clicked search button: {button_selector}")
-                                button_clicked = True
-                                break
-                        except:
-                            continue
-                    
-                    if not button_clicked:
-                        logging.info("SUCCESS: Enter key worked - no search button needed")
-                        
-                except Exception as e:
-                    logging.debug(f"Search button fallback failed: {e}")
-                
-                logging.info("Submitted course search")
-                
+            except TimeoutException:
+                logging.error("TimeoutException while searching for course")
+                return 0
             except Exception as e:
                 logging.error(f"Failed to search for course: {e}")
                 return 0
             
-            # Step 3: Parse results table
+            # Step 4: Parse results table  # Complex section: Nested loop for parsing tables and rows
+            """
+            Docstring for complex parsing section:
+            This section processes HTML tables to extract course information.
+            It identifies relevant rows and extracts data for matching courses.
+            """
             try:
-                # Wait for results table
                 logging.info("Waiting for search results to load...")
-                WebDriverWait(self.driver, 10).until(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, "table, .search-results"))
-                )
+                WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, "table, .search-results")))
                 logging.info("Search results loaded, parsing course data...")
-                
-                # Get page source and parse
                 soup = BeautifulSoup(self.driver.page_source, 'html.parser')
-                
-                # Find the results table
-                tables = soup.find_all('table')
-                logging.info(f"Found {len(tables)} tables on the page")
-                
-                # Track the maximum available seats across all matching sections
-                max_available_seats = 0
+                course_tables = soup.find_all('table')  # Renamed for descriptiveness
+                logging.info(f"Found {len(course_tables)} tables on the page")
+                maximum_seats_available = 0  # Renamed for descriptiveness; Initialize maximum seats
                 found_matching_sections = 0
                 
-                for table_idx, table in enumerate(tables):
-                    rows = table.find_all('tr')
-                    logging.info(f"Table {table_idx}: Found {len(rows)} rows")
-                    
-                    for row_idx, row in enumerate(rows):
-                        cells = row.find_all(['td', 'th'])
-                        if len(cells) < 5:  # Skip header or incomplete rows
-                            continue
-                        
-                        # Look for specific cells using data-property attributes
-                        subject_cell = row.find('td', {'data-property': 'subject'})
-                        course_number_cell = row.find('td', {'data-property': 'courseNumber'})
-                        schedule_type_cell = row.find('td', {'data-property': 'scheduleType'})
-                        status_cell = row.find('td', {'data-property': 'status'})
-                        
-                        if subject_cell and course_number_cell and schedule_type_cell and status_cell:
-                            subject = subject_cell.get_text(strip=True)
-                            course_number = course_number_cell.get_text(strip=True)
-                            schedule_type = schedule_type_cell.get_text(strip=True)
-                            
-                            # Extract status text more robustly - try title attribute first, then text content
-                            status_text = status_cell.get('title', '').strip()
-                            if not status_text:
-                                status_text = status_cell.get_text(strip=True)
-                            
-                            logging.info(f"DEBUG: Row {row_idx} - Subject: {subject}, Course: {course_number}, Type: {schedule_type}, Status: '{status_text}'")
-                            
-                            # Check if this matches our course, is CSCI subject, and is a lecture
-                            if course_number == clean_code and subject == 'CSCI' and schedule_type == 'Lecture':
-                                found_matching_sections += 1
-                                logging.info(f"DEBUG: MATCH #{found_matching_sections}! Found CSCI {clean_code} lecture with status: '{status_text}'")
-                                
-                                section_seats = 0  # Default to 0 seats for this section
-                                
-                                # Pattern 1: "X of Y seats remain/rem..." (case-insensitive, flexible spacing)
-                                seats_remaining_match = re.search(r'(\d+)\s*of\s*\d+\s*seats?\s*rem(?:ain)?', status_text, re.IGNORECASE)
-                                if seats_remaining_match:
-                                    section_seats = int(seats_remaining_match.group(1))
-                                    logging.info(f"PARSED: Section has {section_seats} seats remaining")
-                                
-                                # Pattern 1b: More flexible "X of Y" pattern (backup, flexible spacing)  
-                                elif re.search(r'(\d+)\s*of\s*(\d+)', status_text):
-                                    flexible_match = re.search(r'(\d+)\s*of\s*(\d+)', status_text)
-                                    section_seats = int(flexible_match.group(1))
-                                    total_seats = int(flexible_match.group(2))
-                                    logging.info(f"PARSED: Section has {section_seats} of {total_seats} seats available")
-                                
-                                # Pattern 2: "FULL: 0 of X" - just log it, don't return early
-                                elif 'FULL:' in status_text and '0 of' in status_text:
-                                    section_seats = 0
-                                    logging.info(f"PARSED: Section is full (0 seats)")
-                                
-                                # Pattern 3: Check for "OPEN" status
-                                elif 'OPEN' in status_text.upper():
-                                    # Try to extract number if available
-                                    open_match = re.search(r'(\d+)', status_text)
-                                    if open_match:
-                                        section_seats = int(open_match.group(1))
-                                        logging.info(f"PARSED: Section is open with {section_seats} seats")
-                                    else:
-                                        section_seats = 1  # At least 1 spot available
-                                        logging.info(f"PARSED: Section is open (assuming 1+ seats)")
-                                
-                                # Update maximum available seats
-                                if section_seats > max_available_seats:
-                                    max_available_seats = section_seats
-                                    logging.info(f"NEW MAX: Updated max available seats to {max_available_seats}")
+                # More efficient structure: Use list comprehension to get all rows first
+                all_table_rows = [row for table in course_tables for row in table.find_all('tr')]  # Replaced nested loop
                 
-                # Final result
+                for table_row in all_table_rows:  # Iterate through flattened rows
+                    # Add comment for complex logic
+                    cells = table_row.find_all(['td', 'th'])  # Comment: Extract cells from the row
+                    if len(cells) < 5:
+                        continue  # Skip rows with insufficient cells
+                    subject_cell = table_row.find('td', {'data-property': 'subject'})
+                    course_number_cell = table_row.find('td', {'data-property': 'courseNumber'})
+                    schedule_type_cell = table_row.find('td', {'data-property': 'scheduleType'})
+                    status_cell = table_row.find('td', {'data-property': 'status'})
+                    if subject_cell and course_number_cell and schedule_type_cell and status_cell:
+                        subject = subject_cell.get_text(strip=True)
+                        course_number = course_number_cell.get_text(strip=True)
+                        schedule_type = schedule_type_cell.get_text(strip=True)
+                        status_text = status_cell.get('title', '').strip() or status_cell.get_text(strip=True)
+                        if course_number == clean_course_code and subject == 'CSCI' and schedule_type == 'Lecture':
+                            found_matching_sections += 1
+                            seats_remaining_match = re.search(r'(\d+)\s*of\s*\d+\s*seats?\s*rem(?:ain)?', status_text, re.IGNORECASE)
+                            if seats_remaining_match:
+                                section_seats = int(seats_remaining_match.group(1))
+                            elif re.search(r'(\d+)\s*of\s*(\d+)', status_text):
+                                section_seats = int(re.search(r'(\d+)\s*of\s*(\d+)', status_text).group(1))
+                            elif 'FULL:' in status_text and '0 of' in status_text:
+                                section_seats = 0
+                            elif 'OPEN' in status_text.upper():
+                                open_match = re.search(r'(\d+)', status_text)
+                                section_seats = int(open_match.group(1)) if open_match else 1
+                            else:
+                                section_seats = 0
+                            if section_seats > maximum_seats_available:
+                                maximum_seats_available = section_seats
                 if found_matching_sections == 0:
-                    logging.info(f"Course {clean_code}: No CSCI lecture sections found")
+                    logging.info(f"Course {clean_course_code}: No CSCI lecture sections found")
                     return 0
-                elif max_available_seats > 0:
-                    logging.info(f"SUCCESS: Course {clean_code}: {max_available_seats} seats available (checked {found_matching_sections} CSCI lecture sections)")
-                    return max_available_seats
-                else:
-                    logging.info(f"Course {clean_code}: Found {found_matching_sections} CSCI lecture sections, but all are full")
-                    return 0
-                
+                return maximum_seats_available
+            except TimeoutException:
+                logging.error("TimeoutException while parsing results")
+                return 0
             except Exception as e:
                 logging.error(f"Failed to parse results: {e}")
                 return 0
-            
         except TimeoutException:
             logging.error(f"Timeout while checking course {course_code}")
             return 0
@@ -683,4 +503,4 @@ class CourseScraper:
                 self.driver.quit()
                 logging.info("WebDriver closed successfully")
             except Exception as e:
-                logging.error(f"Error closing WebDriver: {e}") 
+                logging.error(f"Error closing WebDriver: {e}")
