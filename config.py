@@ -37,7 +37,7 @@ def validate_config() -> bool:
         "TWILIO_TO": TWILIO_TO,
     }
     
-    missing_vars = [var for var, value in required_vars.items() if not value]
+    missing_vars = (var for var, value in required_vars.items() if not value)
     
     if missing_vars:
         logging.error(f"Missing required environment variables: {', '.join(missing_vars)}")
@@ -47,4 +47,4 @@ def validate_config() -> bool:
         logging.error("No course codes specified in COURSE_CODES")
         return False
     
-    return True 
+    return True
