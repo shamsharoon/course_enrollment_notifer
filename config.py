@@ -16,7 +16,7 @@ COURSE_CODES = [c.strip() for c in os.getenv("COURSE_CODES").split(",") if c.str
 INTERVAL_MIN = int(os.getenv("INTERVAL_MIN"))
 
 # Site Configuration
-BASE_URL = os.getenv("BASE_URL", "https://ssp.mycampus.ca/StudentRegistrationSsb/ssb/registration/registerPostSignIn?mode=registration&mepCode=UOIT")
+BASE_URL = os.getenv("BASE_URL")
 SITE_USERNAME = os.getenv("SITE_USERNAME")  
 SITE_PASSWORD = os.getenv("SITE_PASSWORD")
 

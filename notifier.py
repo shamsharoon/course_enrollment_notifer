@@ -3,7 +3,6 @@ from twilio.base.exceptions import TwilioException
 from datetime import datetime
 import logging
 from config import TWILIO_SID, TWILIO_TOKEN, TWILIO_FROM, TWILIO_TO
-from utils import format_course_url
 
 class NotificationService:
     def __init__(self):

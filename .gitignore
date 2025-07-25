@@ -40,6 +40,7 @@ env/
 
 # Chrome profile and browser data
 chrome_profile/
+test_chrome_profile/
 *.crx
 
 # Logs
@@ -58,6 +59,8 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp
+debug_main.py
+debug_page.py
 
 # Docker
 .dockerignore

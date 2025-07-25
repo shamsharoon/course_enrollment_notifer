@@ -43,7 +43,7 @@ class CourseMonitor:
     
     def setup_signal_handlers(self) -> None:
         """Setup graceful shutdown handlers."""
-        def signal_handler(signum, frame):
+        def signal_handler(signum):
             logging.info(f"Received signal {signum}, shutting down gracefully...")
             self.shutdown()
             sys.exit(0)

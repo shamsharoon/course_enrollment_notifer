@@ -9,8 +9,8 @@ from bs4 import BeautifulSoup
 import re
 import logging
 import time
-from config import CHROME_PROFILE_PATH, HEADLESS, SITE_USERNAME, SITE_PASSWORD, BASE_URL
-from utils import format_course_url, sanitize_course_code
+from config import HEADLESS, SITE_USERNAME, SITE_PASSWORD, BASE_URL
+from utils import sanitize_course_code
 
 class CourseScraper:
     def __init__(self):
@@ -261,7 +261,7 @@ class CourseScraper:
             # Step 2: Check if we need to select term or if we're already at registration page
             try:
                 # Wait a moment for page to load after login
-                time.sleep(5)
+                time.sleep(3)
                 
                 logging.info(f"After login - Current URL: {self.driver.current_url}")
                 logging.info(f"After login - Page title: {self.driver.title}")
